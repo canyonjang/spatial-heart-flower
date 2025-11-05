@@ -131,19 +131,35 @@
   }
 
   function pageEnd(){
-    const n=results.length;
-    const acc = n? Math.round(results.filter(r=>r.correct).length*100/n):0;
-    const meanRT = n? Math.round(results.reduce((s,r)=>s+r.rt,0)/n):NaN;
-    render(`
-      <h2>끝났습니다.</h2>
-      <p>참가자: <strong>${PID}</strong></p>
-      <p>정답률: <strong>${acc}%</strong></p>
-      <p>평균 반응시간: <strong>${meanRT} ms</strong></p>
-      <div class="btns"><button class="btn" id="csv">CSV 다운로드</button></div>
-      <p class="muted">(필요하면 선생님에게 제출하세요.)</p>
-    `);
-    document.getElementById("csv").onclick = downloadCSV;
+  const n=results.length;
+  const acc = n? Math.round(results.filter(r=>r.correct).length*100/n):0;
+  const meanRT = n? Math.round(results.reduce((s,r)=>s+r.rt,0)/n):NaN;
+
+  // ✅ 구글 시트 자동 전송
+  if(SCRIPT_URL){
+    try {
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ results })
+      });
+    } catch(e){
+      console.log("전송 실패 (무시):", e);
+    }
   }
+
+  render(`
+    <h2>끝났습니다.</h2>
+    <p>참가자: <strong>${PID}</strong></p>
+    <p>정답률: <strong>${acc}%</strong></p>
+    <p>평균 반응시간: <strong>${meanRT} ms</strong></p>
+    <div class="btns"><button class="btn" id="csv">CSV 다운로드</button></div>
+    <p class="muted">(제출은 이미 선생님 구글시트에 저장되었습니다.)</p>
+  `);
+
+  document.getElementById("csv").onclick = downloadCSV;
+}
 
   pagePID();
 })();
