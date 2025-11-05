@@ -31,7 +31,7 @@
 (function(){
   const app = document.getElementById("app");
   let PID = "";
-  const TRIALS = 40;
+  const TRIALS = 20;
   let index = 0;
   const results = [];
 
@@ -45,7 +45,7 @@
     render(`
       <h1>하트/꽃 공간 불일치 과제</h1>
       <p>참가자 ID를 입력해 주세요.</p>
-      <p><input type="text" id="pid" placeholder="예: 302_홍길동"/></p>
+      <p><input type="text" id="pid" placeholder="예: 홍길동"/></p>
       <div class="btns"><button class="btn" id="start">다음</button></div>
     `);
     document.getElementById("start").onclick = () => {
@@ -87,7 +87,6 @@
 
     render(`
       <h2>문항 ${index+1} / ${TRIALS}</h2>
-      <span class="rule ${ruleClass}">${ruleLabel}</span>
       <div class="lane">
         <div class="slot">${side==="L"?shown:""}</div>
         <div class="slot">${side==="R"?shown:""}</div>
