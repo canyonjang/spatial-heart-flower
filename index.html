@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>공간 불일치 과제 (하트/꽃, UMD/프리뷰 호환)</title>
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css">
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; margin:0; background:#fafafa; color:#111}
+  .wrap{max-width:920px; margin:24px auto; padding:16px}
+  .panel{background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:20px; box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  h1{font-size:22px; margin:0 0 8px}
+  .stim-area{position:relative; height:220px; display:flex; align-items:center; justify-content:center}
+  .lane{position:relative; width:80%; max-width:560px; height:110px; border-radius:14px; border:2px dashed #ddd; display:flex; align-items:center; justify-content:space-between; padding:0 24px}
+  .stim-img{width:80px; height:80px; display:flex; align-items:center; justify-content:center; font-size:72px}
+  .rule{position:absolute; top:-12px; background:#111; color:#fff; padding:6px 12px; border-radius:999px; font-weight:700; font-size:14px}
+  .rule.heart{background:#ef4444}
+  .rule.flower{background:#16a34a}
+  .meta{color:#666; font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>공간 불일치 과제 (하트/꽃)</h1>
+    <div id="boot"></div>
+  </div>
+</div>
+
+<!-- ✅ UMD 스크립트 (프리뷰/학교망에서도 모듈 없이 동작) -->
+<script src="https://unpkg.com/jspsych@7.3.3/dist/jspsych.js"></script>
+<script src="https://unpkg.com/@jspsych/plugin-instructions@1.2.0"></script>
+<script src="https://unpkg.com/@jspsych/plugin-survey-text@1.2.0"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
+
+<script>
+(function(){
+  const mount = document.getElementById('boot');
+
+  // 0) 필수 전역 심볼 점검 (프리뷰 실패시 원인 안내)
+  const guards = [
+    ['jsPsych', window.jsPsych],
+    ['jsPsychInstructions', window.jsPsychInstructions],
+    ['jsPsychSurveyText', window.jsPsychSurveyText],
+    ['jsPsychHtmlButtonResponse', window.jsPsychHtmlButtonResponse],
+  ];
+  const missing = guards.filter(([name,ref])=>!ref).map(([name])=>name);
+  if(missing.length){
+    mount.innerHTML = `
+      <div style="background:#ffecec;border:1px solid #ffb3b3;color:#a40000;padding:12px 14px;border-radius:8px;">
+        <strong>라이브러리 로드 실패</strong><br>
+        다음 전역 심볼을 불러오지 못했습니다: ${missing.join(', ')}<br>
+        - 학교망/프록시에서 <code>unpkg.com</code> 차단 여부를 확인하세요.<br>
+        - 또는 Netlify/GitHub Pages로 올려서 실행해 보세요.<br>
+      </div>`;
+    return;
+  }
+
+  // 1) 설정
+  const SCRIPT_URL = ""; // (선택) 구글 시트 Apps Script 웹앱 URL. 비우면 전송 안 함.
+  const N_TRIALS = 40;
+  const CHOICES = ['왼쪽','오른쪽'];
+  const nowTs = () => new Date().toISOString();
+
+  // 2) jsPsych 초기화
+  const jsP = jsPsych.init({
+    on_finish: function(){
+      // CSV 자동 저장
+      const csv = jsPsych.data.get().csv();
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `heart_flower_${Date.now()}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 30000);
+    }
+  });
+
+  const timeline = [];
+
+  // 3) 참가자 ID
+  timeline.push({
+    type: jsPsychSurveyText,
+    preamble: '<h3>참가자 ID</h3><p>예: 302_홍길동</p>',
+    questions: [{prompt:'Participant ID', name:'pid', required:true}],
+    on_finish: data => {
+      const pid = (JSON.parse(data.responses).pid || '').trim();
+      jsPsych.data.addProperties({ pid });
+    }
+  });
+
+  // 4) 지침
+  timeline.push({
+    type: jsPsychInstructions,
+    pages: [
+      '<h3>지침</h3>'+
+      '<p>화면의 왼쪽 또는 오른쪽에 <strong>하트(❤️)</strong> 또는 <strong>꽃(🌸)</strong>이 나타납니다.</p>'+
+      '<ul><li>하트(❤️): <u>그 쪽</u> 버튼을 누르세요.</li>'+
+      '<li>꽃(🌸): <u>반대쪽</u> 버튼을 누르세요.</li></ul>'+
+      '<p>가능하면 빠르고 정확하게 응답하세요. (PC: F=왼쪽, J=오른쪽)</p>'
+    ],
+    show_clickable_nav: true,
+    button_label_next: '시작'
+  });
+
+  // 5) 자극 HTML
+  function stimHTML(type, side){
+    const left  = side==='L' ? `<div class="stim-img">${type==='heart'?'❤️':'🌸'}</div>` : '<div class="stim-img"></div>';
+    const right = side==='R' ? `<div class="stim-img">${type==='heart'?'❤️':'🌸'}</div>` : '<div class="stim-img"></div>';
+    const ruleClass = (type==='heart') ? 'heart' : 'flower';
+    const ruleLabel = (type==='heart') ? '하트: 같은쪽' : '꽃: 반대쪽';
+    return `
+      <div class="stim-area">
+        <div class="rule ${ruleClass}">${ruleLabel}</div>
+        <div class="lane">${left}${right}</div>
+      </div>`;
+  }
+
+  // 6) 트라이얼 구성
+  const trials = [];
+  for(let i=0;i<N_TRIALS;i++){
+    const stimType = Math.random()<0.5 ? 'heart' : 'flower';
+    const side = Math.random()<0.5 ? 'L' : 'R';
+    const correctSide = (stimType==='heart') ? side : (side==='L' ? 'R' : 'L');
+    const correctIndex = (correctSide==='L') ? 0 : 1; // 버튼 배열 index (0=왼,1=오)
+
+    trials.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: stimHTML(stimType, side),
+      choices: CHOICES,
+      data: { qid:`HF_${(i+1).toString().padStart(2,'0')}`, stim_type:stimType, stim_side:side, correct_index:correctIndex+1 },
+      on_load: () => {
+        const onKey = (e)=>{
+          if(e.key==='f' || e.key==='F') document.querySelector('.jspsych-btn:nth-child(1)')?.click();
+          if(e.key==='j' || e.key==='J') document.querySelector('.jspsych-btn:nth-child(2)')?.click();
+        };
+        window.addEventListener('keydown', onKey, { once:true });
+      },
+      on_finish: async (data) => {
+        const respIdx = data.response;            // 0/1
+        const respCode = (respIdx===0?1:2);       // 1=왼, 2=오 (규격)
+        const correct = (respIdx === correctIndex);
+        data.response = respCode;
+        data.correct = correct;
+        data.rt_ms = data.rt;
+        data.timestamp = nowTs();
+
+        const pid = jsPsych.data.get().values().find(d=>d.pid)?.pid || '';
+        if(SCRIPT_URL){
+          try{
+            await fetch(SCRIPT_URL, {
+              method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ rows: [[pid, data.qid, respCode, data.correct_index, correct, data.rt_ms, data.timestamp]] })
+            });
+          }catch(err){ /* 전송 실패 무시 */ }
+        }
+      }
+    });
+  }
+  timeline.push(...trials);
+
+  // 7) 종료 요약
+  timeline.push({
+    type: jsPsychHtmlButtonResponse,
+    stimulus: () => {
+      const t = jsPsych.data.get().filter(d => /^HF_/.test(d.qid||''));
+      const acc = t.count() ? t.filter({correct:true}).count()/t.count() : 0;
+      const mrt = Math.round(t.select('rt').mean());
+      const pid = jsPsych.data.get().values().find(d=>d.pid)?.pid || '';
+      return `<h3>끝났습니다.</h3>
+        <p>참가자 ID: <strong>${pid}</strong></p>
+        <p>정답률: <strong>${Math.round(acc*100)}%</strong></p>
+        <p>평균 반응시간: <strong>${isFinite(mrt)?mrt:'N/A'} ms</strong></p>
+        <p class="meta">CSV 자동 다운로드가 되지 않으면 팝업 차단을 해제하고 다시 시도하세요.</p>`;
+    },
+    choices: ['닫기']
+  });
+
+  // 8) 실행
+  jsP.run(timeline);
+})();
+</script>
+</body>
+</html>
